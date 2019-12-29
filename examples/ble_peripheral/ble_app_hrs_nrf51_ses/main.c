@@ -149,6 +149,7 @@ static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;
 static uint8_t fds_init_wait_flag = 0;
 
 static uint8_t m_custom_value = 0;
+static uint8_t prox_sensor_data0 = 0;
 static uint8_t notif_bool = 0;
 
 //ble_os_t m_our_service;
@@ -1561,6 +1562,7 @@ void VIBRO_test(){
 
 void bt_btn_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
   //place code here to run when the bluetooth button is pressed
+   ble_advertising_start(BLE_ADV_MODE_FAST);
     LED_BT_blue();
     nrf_delay_ms(200);
     LED_BT_off();
@@ -1682,8 +1684,10 @@ int main(void)
     // Start execution.
     NRF_LOG_INFO("Template started\r\n");
     //application_timers_start();
+ /*
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
+    */
 
     // Enter main loop.
     for (;;)
