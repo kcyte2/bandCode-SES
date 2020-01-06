@@ -149,6 +149,7 @@ static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;
 static uint8_t fds_init_wait_flag = 0;
 
 static uint8_t m_custom_value = 0;
+static uint8_t prox_Data0 = 21;
 static uint8_t notif_bool = 0;
 
 //ble_os_t m_our_service;
@@ -331,7 +332,8 @@ static void timer_timeout_handler(void * p_context)
     
     if(notif_bool == 1){
        //err_code = ble_cus_custom_value_update(&m_cus, m_custom_value);
-      err_code = ble_cus_custom_value_update(&m_cus, m_custom_value, &m_cus.custom_value_handles);
+      //err_code = ble_cus_custom_value_update(&m_cus, m_custom_value, &m_cus.custom_value_handles);
+      err_code = ble_cus_custom_value_update(&m_cus, prox_Data0, &m_cus.custom_value_handles);
     }
     
 }
@@ -1561,9 +1563,10 @@ void VIBRO_test(){
 
 void bt_btn_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
   //place code here to run when the bluetooth button is pressed
+ ble_advertising_start(BLE_ADV_MODE_FAST);
     LED_BT_blue();
     nrf_delay_ms(200);
-    LED_BT_off();
+    //LED_BT_off();
     printf("bt button pressed!\r\n");
 }
 void pwr_btn_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
@@ -1596,13 +1599,78 @@ void button_init_interrupt(){
     APP_ERROR_CHECK(err_code);
     nrf_drv_gpiote_in_event_enable(bt_pin, true);
 }
+uint8_t* prox_get(){
+    ret_code_t err_code;
+                    //read VCNL prox snesor data
+                    uint8_t address = 0x60; //0x60  for prox                    
+                    uint8_t dataToSend2[3] = {0x03,0x00,0x00};
+                    err_code = nrf_drv_twi_tx(&m_twi, address, &dataToSend2[0], sizeof(dataToSend2), false);
+                    
+                    //first half of read
+                    uint8_t dataToSend[1] = {0xF2};
+                    err_code = nrf_drv_twi_tx(&m_twi, address, &dataToSend[0], sizeof(dataToSend), true);
 
+
+                    uint8_t read_data[2];
+            err_code = nrf_drv_twi_rx(&m_twi, address, &read_data[0], 2);
+                    printf("recieved: 0x%x 0x%x\r\n",read_data[1], read_data[0]);
+                    if (err_code == NRF_SUCCESS){}
+                        nrf_delay_ms(200);
+                        return read_data;
+}
 //===============================END SENSOR STUFF=====================================
 
 /**@brief Function for application main entry.
  */
 int main(void)
 {
+
+    //sensor code
+        //These are direct NRF GPIO
+    MUX_init();                     //setup nrf GPIO to output
+    MUX_set(1,1,1,1);       //1111 for SDA -> LEDs  (s3 s2 s1 s0)
+    band_uart_init();       // setup UART
+        
+    //then do twi init, since it tends to get stuck here
+    twi_init();
+    //twi1_init();
+    
+    nrf_delay_ms(1000);
+    scan_twi(); // do a twi scan
+    //scan_twi1();
+    printf("Line1641");
+    //buttons
+    //button_init_simple();
+    button_init_interrupt(); //turns on BT light when button pressed
+    printf("Line1645");
+    
+    //indicator LED stuff on 0x23 expander
+    LED_indicator_init();
+    //LED_demo();
+    LED_PWR_yellow();
+    printf("Line1651");
+    
+
+    
+    //indicator LED stuff on 0x22 expander
+    LED_vertBoard_init();
+    //LED_WHITE_on();
+    printf("Line1658");
+    //LED_demo();
+    printf("Line1660");
+    //RGBW setup
+    MUX_set(0,0,1,1);
+    printf("Line1663");
+    RGBW_on();
+
+    MUX_set(1,1,1,1);  
+ printf("End of code");
+    //get prox data
+    //uint8_t * proxData = 0;
+    //proxData = prox_get();
+    //prox_Data0 = prox_get();
+
+    //end sensor code   
     uint32_t err_code;
     bool     erase_bonds;
 
@@ -1610,7 +1678,7 @@ int main(void)
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
 
-    
+   
   
     timers_init();
     application_timers_start();
@@ -1631,45 +1699,7 @@ int main(void)
         fds_init_wait_flag = 0; 
     }*/
     
-    //sensor code
-        //These are direct NRF GPIO
-    MUX_init();                     //setup nrf GPIO to output
-    MUX_set(1,1,1,1);       //1111 for SDA -> LEDs  (s3 s2 s1 s0)
-    band_uart_init();       // setup UART
-        
-    //then do twi init, since it tends to get stuck here
-    twi_init();
-    //twi1_init();
-    
-    nrf_delay_ms(1000);
-    scan_twi(); // do a twi scan
-    //scan_twi1();
-    
-    //buttons
-    //button_init_simple();
-    button_init_interrupt(); //turns on BT light when button pressed
-    
-    
-    //indicator LED stuff on 0x23 expander
-    LED_indicator_init();
-    //LED_demo();
-    LED_PWR_yellow();
-    
-    
 
-    
-    //indicator LED stuff on 0x22 expander
-    LED_vertBoard_init();
-    //LED_WHITE_on();
-    
-    LED_demo();
-    
-    //RGBW setup
-    MUX_set(0,0,1,1);
-    RGBW_on();
-
-    MUX_set(1,1,1,1);   
-    //end sensor code   
     while(m_custom_value <= 1)
     {
       power_manage();
@@ -1682,8 +1712,10 @@ int main(void)
     // Start execution.
     NRF_LOG_INFO("Template started\r\n");
     //application_timers_start();
+    /*
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
+    */
 
     // Enter main loop.
     for (;;)
